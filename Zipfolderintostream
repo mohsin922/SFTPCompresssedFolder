@@ -1,0 +1,61 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using Renci.SshNet;
+
+namespace SftpExample
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            // Connect to SFTP server
+            var connectionInfo = new ConnectionInfo("sftp.example.com", 22, "username", new PasswordAuthenticationMethod("username", "password"));
+            using (var sftp = new SftpClient(connectionInfo))
+            {
+                sftp.Connect();
+                
+                // Define the path of the zip file to download and extract
+                var zipFilePath = "/remote/path/to/zipfile.zip";
+                
+                // Download the zip file to memory
+                using (var remoteFileStream = sftp.OpenRead(zipFilePath))
+                using (var inMemoryStream = new MemoryStream())
+                {
+                    remoteFileStream.CopyTo(inMemoryStream);
+
+                    // Extract the files from the zip archive
+                    inMemoryStream.Seek(0, SeekOrigin.Begin);
+                    var fileStreams = new List<Stream>();
+                    using (var archive = new ZipArchive(inMemoryStream, ZipArchiveMode.Read))
+                    {
+                        foreach (var entry in archive.Entries)
+                        {
+                            using (var entryStream = entry.Open())
+                            using (var fileStream = new MemoryStream())
+                            {
+                                entryStream.CopyTo(fileStream);
+                                fileStreams.Add(fileStream);
+                            }
+                        }
+                    }
+
+                    // Close SFTP connection
+                    sftp.Disconnect();
+                    
+                    // Do something with the file streams
+                    foreach (var fileStream in fileStreams)
+                    {
+                        // For example, write the file stream to a file
+                        using (var file = File.Create("output.txt"))
+                        {
+                            fileStream.Seek(0, SeekOrigin.Begin);
+                            fileStream.CopyTo(file);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
