@@ -1,0 +1,39 @@
+using WinSCP;
+
+// Setup session options
+SessionOptions sessionOptions = new SessionOptions
+{
+    Protocol = Protocol.Sftp,
+    HostName = "hostname",
+    UserName = "username",
+    Password = "password",
+};
+
+using (Session session = new Session())
+{
+    // Connect to SFTP server
+    session.Open(sessionOptions);
+
+    // Download files
+    TransferOptions transferOptions = new TransferOptions();
+    transferOptions.TransferMode = TransferMode.Binary;
+
+    RemoteDirectoryInfo directoryInfo = session.ListDirectory("/remote/path");
+    foreach (RemoteFileInfo fileInfo in directoryInfo.Files)
+    {
+        if (!fileInfo.IsDirectory)
+        {
+            TransferOperationResult transferResult;
+            transferResult = session.GetFiles(fileInfo.FullName, "C:\\local\\path\\", false, transferOptions);
+
+            // Throw on any error
+            transferResult.Check();
+
+            // Print results
+            foreach (TransferEventArgs transfer in transferResult.Transfers)
+            {
+                Console.WriteLine("Download of {0} succeeded", transfer.FileName);
+            }
+        }
+    }
+}
