@@ -1,0 +1,52 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using WinSCP;
+
+namespace SftpDownloader
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            string hostName = "sftp.example.com";
+            string userName = "username";
+            string password = "password";
+            string remotePath = "/remote/path";
+            string localPath = @"C:\local\path\";
+            int numberOfThreads = 4; // Change this as needed
+
+            using (Session session = new Session())
+            {
+                session.Open(new SessionOptions
+                {
+                    Protocol = Protocol.Sftp,
+                    HostName = hostName,
+                    UserName = userName,
+                    Password = password,
+                });
+
+                IEnumerable<RemoteFileInfo> files = session.EnumerateRemoteFiles(remotePath, null, EnumerationOptions.AllDirectories);
+
+                Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = numberOfThreads }, file =>
+                {
+                    string remoteFilePath = file.FullName;
+                    string localFilePath = Path.Combine(localPath, file.Name);
+
+                    using (Stream outputStream = new MemoryStream())
+                    {
+                        session.GetFiles(remoteFilePath, outputStream);
+
+                        outputStream.Position = 0;
+
+                        using (Stream fileStream = File.Create(localFilePath))
+                        {
+                            outputStream.CopyTo(fileStream);
+                        }
+                    }
+                });
+            }
+        }
+    }
+}
