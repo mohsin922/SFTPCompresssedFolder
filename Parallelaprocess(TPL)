@@ -1,0 +1,39 @@
+// Set up session options
+SessionOptions sessionOptions = new SessionOptions
+{
+    Protocol = Protocol.Sftp,
+    HostName = "example.com",
+    UserName = "username",
+    Password = "password",
+    SshHostKeyFingerprint = "ssh-rsa 2048 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+};
+
+// Connect to SFTP server
+using (Session session = new Session())
+{
+    // Connect to session
+    session.Open(sessionOptions);
+
+    // Set up transfer options
+    TransferOptions transferOptions = new TransferOptions
+    {
+        TransferMode = TransferMode.Binary
+    };
+
+    // Get list of remote files
+    RemoteDirectoryInfo directoryInfo = session.ListDirectory("/remote/path");
+    IEnumerable<RemoteFileInfo> remoteFiles = directoryInfo.Files;
+
+    // Set up parallel options
+    ParallelOptions parallelOptions = new ParallelOptions
+    {
+        MaxDegreeOfParallelism = Environment.ProcessorCount // Use all available processors
+    };
+
+    // Download files in parallel
+    Parallel.ForEach(remoteFiles, parallelOptions, (remoteFile) =>
+    {
+        string localFilePath = Path.Combine(@"C:\local\path", remoteFile.Name);
+        session.GetFiles("/remote/path/" + remoteFile.Name, localFilePath, false, transferOptions).Check();
+    });
+}
