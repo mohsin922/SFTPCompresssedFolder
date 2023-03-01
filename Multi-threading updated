@@ -1,0 +1,52 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using WinSCP;
+
+public class SftpDownloader
+{
+    private readonly SessionOptions _sessionOptions;
+
+    public SftpDownloader(SessionOptions sessionOptions)
+    {
+        _sessionOptions = sessionOptions;
+    }
+
+    public async Task<List<Stream>> DownloadFilesAsync(IEnumerable<string> remotePaths)
+    {
+        List<Stream> streams = new List<Stream>();
+
+        using (var session = new Session())
+        {
+            session.Open(_sessionOptions);
+
+            var transferOptions = new TransferOptions
+            {
+                TransferMode = TransferMode.Binary
+            };
+
+            var tasks = new List<Task>();
+            foreach (var remotePath in remotePaths)
+            {
+                var task = Task.Run(() =>
+                {
+                    using (var stream = new MemoryStream())
+                    {
+                        session.GetFiles(remotePath, stream, false, transferOptions);
+                        stream.Position = 0;
+                        lock (streams)
+                        {
+                            streams.Add(stream);
+                        }
+                    }
+                });
+
+                tasks.Add(task);
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        return streams;
+    }
+}
